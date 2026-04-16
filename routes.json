@@ -1,0 +1,53 @@
+[
+    {
+        "id": "GRU-MAD-MAI",
+        "origin": "GRU",
+        "destination": "MAD",
+        "dateStart": "2026-05-01",
+        "dateEnd": "2026-05-31",
+        "tripDays": 7,
+        "adults": 1,
+        "maxPrice": 6000,
+        "sites": [
+            "latam",
+            "gol",
+            "iberia",
+            "avianca",
+            "decolar"
+        ],
+        "active": true
+    },
+    {
+        "id": "GRU-MAD-JUL",
+        "origin": "GRU",
+        "destination": "MAD",
+        "dateStart": "2026-07-01",
+        "dateEnd": "2026-07-31",
+        "tripDays": 7,
+        "adults": 1,
+        "maxPrice": 6000,
+        "sites": [
+            "latam",
+            "gol",
+            "avianca",
+            "decolar"
+        ],
+        "active": true
+    },
+    {
+        "id": "VCP-MAD-MAI",
+        "origin": "VCP",
+        "destination": "MAD",
+        "dateStart": "2026-05-01",
+        "dateEnd": "2026-05-31",
+        "tripDays": 14,
+        "adults": 2,
+        "maxPrice": 8000,
+        "sites": [
+            "latam",
+            "iberia",
+            "decolar"
+        ],
+        "active": false
+    }
+]

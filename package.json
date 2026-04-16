@@ -1,0 +1,22 @@
+{
+  "name": "flight-hunter",
+  "version": "1.0.0",
+  "description": "Monitor de passagens aéreas com detecção de promoções via Telegram",
+  "main": "dist/index.js",
+  "scripts": {
+    "hunt": "ts-node src/index.ts",
+    "install:browsers": "npx playwright install chromium --with-deps",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.9.3",
+    "playwright": "^1.43.1",
+    "dotenv": "^16.4.5",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
