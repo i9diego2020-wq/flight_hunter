@@ -1,7 +1,5 @@
 import type { FlightResult } from '../scrapers/base';
-import type { PriceStats } from '../db/neon';
-import type { DealLevel } from '../engine/priceIntel';
-import { formatSavingsPercent, formatDateBR } from '../engine/priceIntel';
+import { formatDateBR } from '../engine/priceIntel';
 
 const BASE_URL = 'https://api.telegram.org';
 
@@ -14,47 +12,30 @@ export class TelegramNotifier {
         this.chatId = chatId;
     }
 
-    async sendAlert(
-        flight: FlightResult,
-        stats: PriceStats,
-        dealLevel: DealLevel,
-    ): Promise<void> {
-        const emoji = dealLevel === 'PROMOTION' ? '🔥' : '✅';
-        const label = dealLevel === 'PROMOTION' ? 'PROMOÇÃO DETECTADA' : 'BOM PREÇO';
-        const savings = formatSavingsPercent(flight.price, stats);
-
+    async sendAlert(flight: FlightResult): Promise<void> {
         const priceFormatted = flight.price.toLocaleString('pt-BR', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
         });
-        const avgFormatted = stats.avg.toLocaleString('pt-BR', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        });
 
-        const returnLine = flight.returnDate
-            ? `📅 *Ida:* ${formatDateBR(flight.departureDate)} · *Volta:* ${formatDateBR(flight.returnDate)}\n`
-            : `📅 *Ida:* ${formatDateBR(flight.departureDate)} _(só ida)_\n`;
+        const dateLine = flight.returnDate
+            ? `📅 *Ida:* ${formatDateBR(flight.departureDate)} · *Volta:* ${formatDateBR(flight.returnDate)}`
+            : `📅 *Ida:* ${formatDateBR(flight.departureDate)} _(só ida)_`;
 
         const stopsLine = flight.stops === 0
-            ? '🛫 *Direto*\n'
-            : `🛫 *${flight.stops} escala(s)*\n`;
-
-        const avgLine = stats.count >= 5
-            ? `📊 *Média histórica:* R$ ${avgFormatted}\n📉 *Economia:* -${savings}%\n`
-            : `📊 _Dados históricos ainda insuficientes para comparação_\n`;
+            ? '🛫 *Direto*'
+            : `🛫 *${flight.stops} escala(s)*`;
 
         const linkLine = flight.link ? `\n🔗 [Ver oferta](${flight.link})` : '';
 
         const message = [
-            `${emoji} *${label}* — ${flight.origin} → ${flight.destination}`,
+            `✈️ *${flight.origin} → ${flight.destination}*`,
             ``,
-            `✈️ *Companhia:* ${flight.airline || flight.site}`,
+            `🏢 *Companhia:* ${flight.airline || flight.site}`,
             `🌐 *Site:* ${flight.site.charAt(0).toUpperCase() + flight.site.slice(1)}`,
-            returnLine.trimEnd(),
-            stopsLine.trimEnd(),
+            dateLine,
+            stopsLine,
             `💰 *Preço:* R$ ${priceFormatted}`,
-            avgLine.trimEnd(),
             linkLine,
         ]
             .filter((l) => l !== undefined)
@@ -84,12 +65,11 @@ export class TelegramNotifier {
         }
     }
 
-    async sendSummary(routeId: string, totalFound: number, dealsFound: number): Promise<void> {
-        const icon = dealsFound > 0 ? '🎯' : '📋';
+    async sendSummary(routeId: string, totalFound: number, totalSent: number): Promise<void> {
         const msg = [
-            `${icon} *Varredura concluída* — Rota: ${routeId}`,
-            `Resultados analisados: ${totalFound}`,
-            `Alertas disparados:    ${dealsFound}`,
+            `📋 *Varredura concluída* — Rota: ${routeId}`,
+            `Resultados encontrados: ${totalFound}`,
+            `Mensagens enviadas:     ${totalSent}`,
             `⏱ ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
         ].join('\n');
 

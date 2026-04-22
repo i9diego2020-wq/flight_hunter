@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { NeonDB } from './db/neon';
 import { TelegramNotifier } from './notify/telegram';
-import { getDealLevel, sampleDatesInRange, addDays } from './engine/priceIntel';
+import { sampleDatesInRange, addDays } from './engine/priceIntel';
 import { allScrapers } from './scrapers';
 
 interface Route {
@@ -52,12 +52,12 @@ async function main() {
         console.log(`\n${'─'.repeat(60)}`);
         console.log(`📍 Rota: ${route.origin} → ${route.destination} [${route.id}]`);
 
-        // Amostra até 8 datas no intervalo para não sobrecarregar os sites
+        // Amostra até 8 datas no intervalo
         const dates = sampleDatesInRange(route.dateStart, route.dateEnd, 8);
         console.log(`📅 Verificando ${dates.length} data(s): ${dates.join(', ')}`);
 
         let totalFound = 0;
-        let dealsFound = 0;
+        let totalSent = 0;
 
         for (const scraper of Object.values(allScrapers)) {
             if (!route.sites.includes(scraper.siteName)) continue;
@@ -89,43 +89,32 @@ async function main() {
                             continue;
                         }
 
-                        // Salva no banco
-                        await db.savePriceHistory(flight);
                         totalFound++;
+                        console.log(`      ↳ R$ ${flight.price.toFixed(2)}`);
 
-                        // Busca estatísticas históricas
-                        const stats = await db.getRouteStats(route.origin, route.destination);
-                        const dealLevel = getDealLevel(flight.price, stats);
-
-                        console.log(
-                            `      ↳ R$ ${flight.price.toFixed(2)} — ${dealLevel}`
+                        // Evita enviar a mesma combinação nas últimas 24h
+                        const alreadySent = await db.alertAlreadySent(
+                            route.origin,
+                            route.destination,
+                            flight.site,
+                            departureDate,
+                            'REPORT',
                         );
 
-                        // Envia alerta somente se for PROMOÇÃO ou BOM PREÇO
-                        if (dealLevel !== 'NORMAL') {
-                            const alreadySent = await db.alertAlreadySent(
+                        if (!alreadySent) {
+                            console.log(`      🔔 Enviando para o Telegram...`);
+                            await telegram.sendAlert(flight);
+                            await db.saveSentAlert(
                                 route.origin,
                                 route.destination,
                                 flight.site,
                                 departureDate,
-                                dealLevel,
+                                flight.price,
+                                'REPORT',
                             );
-
-                            if (!alreadySent) {
-                                console.log(`      🔔 Enviando alerta Telegram!`);
-                                await telegram.sendAlert(flight, stats, dealLevel);
-                                await db.saveSentAlert(
-                                    route.origin,
-                                    route.destination,
-                                    flight.site,
-                                    departureDate,
-                                    flight.price,
-                                    dealLevel,
-                                );
-                                dealsFound++;
-                            } else {
-                                console.log(`      (alerta já enviado nas últimas 24h)`);
-                            }
+                            totalSent++;
+                        } else {
+                            console.log(`      (já enviado nas últimas 24h)`);
                         }
                     }
 
@@ -136,19 +125,14 @@ async function main() {
                     console.error(`      ❌ Erro: ${(err as Error).message}`);
                 }
 
-                // Delay entre datas para evitar bloqueio
                 await delay(3_000, 6_000);
             }
 
-            // Delay entre sites
             await delay(5_000, 10_000);
         }
 
-        // Resumo da rota
-        console.log(`\n  📊 Resumo [${route.id}]: ${totalFound} resultados, ${dealsFound} alerta(s)`);
-        if (dealsFound > 0) {
-            await telegram.sendSummary(route.id, totalFound, dealsFound);
-        }
+        console.log(`\n  📊 Resumo [${route.id}]: ${totalFound} encontrado(s), ${totalSent} enviado(s)`);
+        await telegram.sendSummary(route.id, totalFound, totalSent);
     }
 
     console.log(`\n${'═'.repeat(60)}`);
