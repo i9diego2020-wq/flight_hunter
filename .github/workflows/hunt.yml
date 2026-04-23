@@ -11,7 +11,7 @@ jobs:
   hunt:
     name: Hunt for flight deals
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 15
 
     steps:
       - name: 📥 Checkout repository
@@ -26,16 +26,10 @@ jobs:
       - name: 📦 Install dependencies
         run: npm ci
 
-      - name: 🌐 Install Playwright + Chromium
-        run: npx playwright install chromium --with-deps
-
       - name: 🛫 Run Flight Hunter
         env:
-          DATABASE_URL:      ${{ secrets.DATABASE_URL }}
-          TELEGRAM_TOKEN:    ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID:  ${{ secrets.TELEGRAM_CHAT_ID }}
-          # Opcionais — ajuste os thresholds conforme preferir
-          DEAL_THRESHOLD_PERCENT:       20
-          GOOD_PRICE_THRESHOLD_PERCENT: 10
-          MIN_SAMPLES_FOR_INTEL:        5
+          TELEGRAM_TOKEN:         ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID:       ${{ secrets.TELEGRAM_CHAT_ID }}
+          AMADEUS_CLIENT_ID:      ${{ secrets.AMADEUS_CLIENT_ID }}
+          AMADEUS_CLIENT_SECRET:  ${{ secrets.AMADEUS_CLIENT_SECRET }}
         run: npx ts-node src/index.ts

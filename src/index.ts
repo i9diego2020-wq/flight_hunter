@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TelegramNotifier } from './notify/telegram';
 import { sampleDatesInRange, addDays } from './engine/priceIntel';
-import { allScrapers } from './scrapers';
+import { searchFlights } from './amadeus';
 
 interface Route {
     id: string;
@@ -14,7 +14,6 @@ interface Route {
     tripDays: number | null;
     adults: number;
     maxPrice?: number;
-    sites: string[];
     active: boolean;
 }
 
@@ -24,23 +23,25 @@ async function delay(min: number, max: number) {
 }
 
 async function main() {
-    // ─── Validação de ambiente ──────────────────────────────────────────────
-    const { TELEGRAM_TOKEN, TELEGRAM_CHAT_ID } = process.env;
+    const { TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, AMADEUS_CLIENT_ID, AMADEUS_CLIENT_SECRET } = process.env;
+
     if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
-        console.error('❌ Variáveis de ambiente faltando: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID');
+        console.error('❌ Faltando: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID');
+        process.exit(1);
+    }
+    if (!AMADEUS_CLIENT_ID || !AMADEUS_CLIENT_SECRET) {
+        console.error('❌ Faltando: AMADEUS_CLIENT_ID, AMADEUS_CLIENT_SECRET');
         process.exit(1);
     }
 
     const telegram = new TelegramNotifier(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID);
 
-    // ─── Carrega rotas ──────────────────────────────────────────────────────
     const routesPath = path.join(process.cwd(), 'routes.json');
     const routes: Route[] = JSON.parse(fs.readFileSync(routesPath, 'utf-8'));
     const activeRoutes = routes.filter((r) => r.active);
 
     console.log(`🛫 Flight Hunter iniciado — ${activeRoutes.length} rota(s) ativa(s)`);
 
-    // ─── Loop principal ─────────────────────────────────────────────────────
     for (const route of activeRoutes) {
         console.log(`\n${'─'.repeat(60)}`);
         console.log(`📍 Rota: ${route.origin} → ${route.destination} [${route.id}]`);
@@ -51,53 +52,46 @@ async function main() {
         let totalFound = 0;
         let totalSent = 0;
 
-        for (const scraper of Object.values(allScrapers)) {
-            if (!route.sites.includes(scraper.siteName)) continue;
+        for (const departureDate of dates) {
+            const returnDate = route.tripDays
+                ? addDays(departureDate, route.tripDays)
+                : undefined;
 
-            console.log(`\n  🌐 Site: ${scraper.siteLabel}`);
+            console.log(`  🔍 ${departureDate}${returnDate ? ` → ${returnDate}` : ' (só ida)'}`);
 
-            for (const departureDate of dates) {
-                const returnDate = route.tripDays
-                    ? addDays(departureDate, route.tripDays)
-                    : undefined;
-
-                console.log(
-                    `    🔍 ${departureDate}${returnDate ? ` → ${returnDate}` : ' (só ida)'}`
-                );
-
-                try {
-                    const flights = await scraper.search({
+            try {
+                const flights = await searchFlights(
+                    {
                         origin: route.origin,
                         destination: route.destination,
                         departureDate,
                         returnDate,
                         adults: route.adults,
-                    });
+                    },
+                    AMADEUS_CLIENT_ID,
+                    AMADEUS_CLIENT_SECRET,
+                );
 
-                    for (const flight of flights) {
-                        // Filtra por preço máximo configurado
-                        if (route.maxPrice && flight.price > route.maxPrice) {
-                            console.log(`      ↳ R$ ${flight.price} (acima do limite de R$ ${route.maxPrice})`);
-                            continue;
-                        }
-
-                        totalFound++;
-                        console.log(`      ↳ R$ ${flight.price.toFixed(2)} — enviando...`);
-                        await telegram.sendAlert(flight);
-                        totalSent++;
+                for (const flight of flights) {
+                    if (route.maxPrice && flight.price > route.maxPrice) {
+                        console.log(`    ↳ R$ ${flight.price} (acima do limite de R$ ${route.maxPrice})`);
+                        continue;
                     }
 
-                    if (flights.length === 0) {
-                        console.log(`      ↳ Nenhum resultado`);
-                    }
-                } catch (err) {
-                    console.error(`      ❌ Erro: ${(err as Error).message}`);
+                    totalFound++;
+                    console.log(`    ↳ R$ ${flight.price.toFixed(2)} — ${flight.airline} — enviando...`);
+                    await telegram.sendAlert(flight);
+                    totalSent++;
                 }
 
-                await delay(3_000, 6_000);
+                if (flights.length === 0) {
+                    console.log(`    ↳ Nenhum resultado`);
+                }
+            } catch (err) {
+                console.error(`    ❌ Erro: ${(err as Error).message}`);
             }
 
-            await delay(5_000, 10_000);
+            await delay(1_000, 2_000);
         }
 
         console.log(`\n  📊 Resumo [${route.id}]: ${totalFound} encontrado(s), ${totalSent} enviado(s)`);
