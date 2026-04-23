@@ -7,7 +7,7 @@
         "dateEnd": "2026-05-31",
         "tripDays": 7,
         "adults": 1,
-        "maxPrice": 6000,
+        "maxPrice": 7000,
         "sites": [
             "latam",
             "gol",
@@ -25,7 +25,7 @@
         "dateEnd": "2026-07-31",
         "tripDays": 7,
         "adults": 1,
-        "maxPrice": 6000,
+        "maxPrice": 7000,
         "sites": [
             "latam",
             "gol",
